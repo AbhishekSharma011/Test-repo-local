@@ -1,15 +1,19 @@
-# --- build stage (optional if you transpile) ---
-FROM node:20-alpine AS base
+FROM node:20-alpine
+
 WORKDIR /app
+
+# Copy only manifests first (better layer caching)
 COPY package*.json ./
-RUN npm ci --only=production
+
+# If you don't have package-lock.json, use install (NOT ci)
+RUN npm install --omit=dev
+
+# Now copy the rest of the app
 COPY . .
 
-# make sure entrypoint is executable even if committed from Windows
+# Make sure entrypoint runs on Linux even if committed from Windows
 RUN chmod +x ./entrypoint.sh
 
-EXPOSE 5000
 ENV NODE_ENV=production
-# run through your entrypoint (you already added it)
+EXPOSE 5000
 ENTRYPOINT ["./entrypoint.sh"]
-
