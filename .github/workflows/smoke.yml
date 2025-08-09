@@ -1,4 +1,5 @@
 name: Smoke
+
 on:
   workflow_dispatch:
   push:
@@ -8,24 +9,33 @@ jobs:
   test:
     runs-on: [self-hosted, linux, x64, local, dind]
 
-    # Start a sidecar Docker daemon
-    services:
-      docker:
-        image: docker:24-dind
-        options: --privileged
-        env:
-          DOCKER_TLS_CERTDIR: ""
-        ports:
-          - 2375:2375   # not strictly required
-
-    env:
-      DOCKER_HOST: tcp://docker:2375
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sanity
+      - name: Runner details
         run: |
-          docker version
+          echo "Runner: $(hostname)"
+          uname -a
+
+      - name: Wait for Docker daemon (up to 3 min)
+        shell: bash
+        run: |
+          echo "Waiting for Docker to be ready..."
+          for i in {1..90}; do
+            if docker info >/dev/null 2>&1; then
+              docker version
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Docker failed to start in time"; ps aux | grep -i dockerd || true; exit 1
+
+      - name: Docker sanity
+        run: |
+          docker info
           docker run --rm hello-world
 
+      - name: List images & containers
+        run: |
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
