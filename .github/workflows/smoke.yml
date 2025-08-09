@@ -1,5 +1,4 @@
 name: Smoke
-
 on:
   workflow_dispatch:
   push:
@@ -11,10 +10,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Echo host
-        run: echo "Hello from $(hostname)"
+      - name: Show runner details
+        run: |
+          echo "Runner: $(hostname)"
+          uname -a
 
-      - name: Docker check
+      - name: Wait for Docker daemon
+        shell: bash
+        run: |
+          echo "Waiting for Docker to be ready..."
+          for i in {1..30}; do
+            if docker info >/dev/null 2>&1; then
+              echo "Docker is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Docker failed to start in time"; exit 1
+
+      - name: Docker sanity
         run: |
           docker info
           docker run --rm hello-world
