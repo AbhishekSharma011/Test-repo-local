@@ -1,0 +1,131 @@
+/* Base styles for the entire application - Font-focused theme */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'fkGroteskNeue', 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  background-color: #ffffff;
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* Enhanced typography for better readability */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  color: #1a1a1a;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+
+/* Code styling with improved typography */
+code {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', 'Courier New', monospace;
+  background-color: #f8f9fa;
+  color: #1a1a1a;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.875em;
+  font-weight: 500;
+  border: 1px solid #e5e7eb;
+}
+
+pre {
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Global link styling with minimal approach */
+a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Improved scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+/* Enhanced focus outline for accessibility */
+:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Selection styling */
+::selection {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #1a1a1a;
+}
+
+/* Typography utilities */
+.text-primary {
+  color: #1a1a1a;
+}
+
+.text-secondary {
+  color: #666666;
+}
+
+.text-tertiary {
+  color: #999999;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+/* Reading-focused layout utilities */
+.reading-width {
+  max-width: 65ch;
+}
+
+.content-spacing > * + * {
+  margin-top: 1.5em;
+}
