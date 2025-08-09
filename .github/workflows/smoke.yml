@@ -1,38 +1,19 @@
-name: Host Runner Smoke
-
+name: Smoke
 on:
-  workflow_dispatch:    # run it manually
+  workflow_dispatch:
   push:
-    branches: [ main ]  # optional: runs on every push to main
+    branches: [ "main" ]
 
 jobs:
-  ping-runner:
-    # must match your runner's labels
-    runs-on: [self-hosted, linux, x64, host]
-    timeout-minutes: 10
-
+  test:
+    runs-on: [self-hosted, linux, x64, host]  # matches the labels you set
     steps:
-      - name: Show runner basics
+      - uses: actions/checkout@v4
+      - name: Runner details
         run: |
-          echo "Repo: $GITHUB_REPOSITORY"
-          echo "Runner: $RUNNER_NAME"
-          echo "Labels: $RUNNER_OS $RUNNER_ARCH (custom: host)"
-          echo "Working dir: $GITHUB_WORKSPACE"
+          echo "Runner: $(hostname)"
           uname -a
-          whoami
-          df -h
-          free -m || true
-
-      - name: Check network
+      - name: Docker sanity (host Docker)
         run: |
-          ping -c 2 github.com || true
-          curl -sI https://api.github.com | head -n 1
-
-      - name: Create and read a file in workspace
-        run: |
-          echo "hello from $(hostname) at $(date)" > hello.txt
-          ls -la
-          cat hello.txt
-
-      - name: Checkout repo (sanity)
-        uses: actions/checkout@v4
+          docker version
+          docker run --rm hello-world
