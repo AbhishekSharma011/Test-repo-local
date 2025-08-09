@@ -1,41 +1,38 @@
-name: Smoke
+name: Host Runner Smoke
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:    # run it manually
   push:
-    branches: [ "main" ]
+    branches: [ main ]  # optional: runs on every push to main
 
 jobs:
-  test:
-    runs-on: [self-hosted, linux, x64, local, dind]
+  ping-runner:
+    # must match your runner's labels
+    runs-on: [self-hosted, linux, x64, host]
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Runner details
+      - name: Show runner basics
         run: |
-          echo "Runner: $(hostname)"
+          echo "Repo: $GITHUB_REPOSITORY"
+          echo "Runner: $RUNNER_NAME"
+          echo "Labels: $RUNNER_OS $RUNNER_ARCH (custom: host)"
+          echo "Working dir: $GITHUB_WORKSPACE"
           uname -a
+          whoami
+          df -h
+          free -m || true
 
-      - name: Wait for Docker daemon (up to 3 min)
-        shell: bash
+      - name: Check network
         run: |
-          echo "Waiting for Docker to be ready..."
-          for i in {1..90}; do
-            if docker info >/dev/null 2>&1; then
-              docker version
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Docker failed to start in time"; ps aux | grep -i dockerd || true; exit 1
+          ping -c 2 github.com || true
+          curl -sI https://api.github.com | head -n 1
 
-      - name: Docker sanity
+      - name: Create and read a file in workspace
         run: |
-          docker info
-          docker run --rm hello-world
+          echo "hello from $(hostname) at $(date)" > hello.txt
+          ls -la
+          cat hello.txt
 
-      - name: List images & containers
-        run: |
-          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"
-          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+      - name: Checkout repo (sanity)
+        uses: actions/checkout@v4
