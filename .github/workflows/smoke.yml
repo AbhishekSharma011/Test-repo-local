@@ -7,28 +7,25 @@ on:
 jobs:
   test:
     runs-on: [self-hosted, linux, x64, local, dind]
+
+    # Start a sidecar Docker daemon
+    services:
+      docker:
+        image: docker:24-dind
+        options: --privileged
+        env:
+          DOCKER_TLS_CERTDIR: ""
+        ports:
+          - 2375:2375   # not strictly required
+
+    env:
+      DOCKER_HOST: tcp://docker:2375
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show runner details
+      - name: Sanity
         run: |
-          echo "Runner: $(hostname)"
-          uname -a
-
-      - name: Wait for Docker daemon
-        shell: bash
-        run: |
-          echo "Waiting for Docker to be ready..."
-          for i in {1..30}; do
-            if docker info >/dev/null 2>&1; then
-              echo "Docker is up."
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Docker failed to start in time"; exit 1
-
-      - name: Docker sanity
-        run: |
-          docker info
+          docker version
           docker run --rm hello-world
+
