@@ -12,64 +12,38 @@ concurrency:
 jobs:
   deploy:
     runs-on: [self-hosted, linux]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Create backend/.env from GitHub Secrets
+      # Write the ONE .env you were given into backend/.env
       - name: Create backend/.env
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p backend
-          cat > backend/.env <<'EOF'
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          DB_HOST=${{ secrets.DB_HOST }}
-          DB_PORT=${{ secrets.DB_PORT }}
-          PORT=${{ secrets.PORT || '5000' }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          TWITTER_BEARER_TOKEN=${{ secrets.TWITTER_BEARER_TOKEN }}
-          TWITTER_CLIENT_ID=${{ secrets.TWITTER_CLIENT_ID }}
-          TWITTER_CLIENT_SECRET=${{ secrets.TWITTER_CLIENT_SECRET }}
-          TWITTER_CALLBACK_URL=${{ secrets.TWITTER_CALLBACK_URL }}
-          TWITTER_ACCESS_TOKEN=${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET=${{ secrets.TWITTER_ACCESS_SECRET }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
-          LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}
-          LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}
-          LINKEDIN_CALLBACK_URL=${{ secrets.LINKEDIN_CALLBACK_URL }}
-          PUPPETEER_ARGS=--no-sandbox --disable-setuid-sandbox
-          EOF
+          printf "%s" "${{ secrets.BACKEND_ENV_DEV }}" > backend/.env
           chmod 600 backend/.env
-
-      - name: Show compose file header (sanity)
-        run: |
-          pwd
-          sed -n '1,120p' docker-compose.yml
-          echo "env_file target:"
-          grep -n "env_file" -n docker-compose.yml || true
 
       - name: Verify Docker & Compose
         run: |
           docker version
           docker compose version
 
-      - name: Build containers
+      # Important: pass --env-file so ${DB_*} in docker-compose.yml get values for postgres
+      - name: Build containers (with env)
         run: |
-          docker compose build --pull
+          set -euo pipefail
+          docker compose --env-file backend/.env build --pull
 
-      - name: Start/Update stack
+      - name: Start/Update stack (with env)
         run: |
-          docker compose up -d --force-recreate --remove-orphans
+          set -euo pipefail
+          docker compose --env-file backend/.env up -d --force-recreate --remove-orphans
 
       - name: Show status
         if: always()
         run: |
-          docker compose ps
+          docker compose --env-file backend/.env ps
           echo "---- Backend logs (tail) ----"
-          docker compose logs --no-color --tail=200 backend || true
-          echo "---- Frontend logs (tail) ----"
-          docker compose logs --no-color --tail=200 frontend || true
+          docker comp

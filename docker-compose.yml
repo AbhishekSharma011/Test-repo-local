@@ -11,7 +11,8 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      # Use container env at runtime; $$ escapes for Compose so the shell in the container sees $POSTGRES_*
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,9 +23,9 @@ services:
       dockerfile: Dockerfile
     container_name: buzzly-backend
     env_file:
-      - backend/.env    # <-- we will create this via the workflow
+      - backend/.env            # created by the workflow from BACKEND_ENV_DEV
     environment:
-      DB_HOST: postgres # use the compose postgres service; change if external DB
+      DB_HOST: postgres         # service name reachable on the compose network
       DB_PORT: 5432
       PORT: 5000
       PUPPETEER_ARGS: "--no-sandbox --disable-setuid-sandbox"
@@ -42,7 +43,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "80:80"
+      - "80:80"                 # if 80 is busy on the host, change to "8080:80"
 
 volumes:
   postgres_data:
