@@ -17,7 +17,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Write the ONE .env you were given into backend/.env
       - name: Create backend/.env
         run: |
           set -euo pipefail
@@ -30,7 +29,11 @@ jobs:
           docker version
           docker compose version
 
-      # Important: pass --env-file so ${DB_*} in docker-compose.yml get values for postgres
+      - name: Disk & Docker usage (before)
+        run: |
+          df -h
+          docker system df || true
+
       - name: Build containers (with env)
         run: |
           set -euo pipefail
@@ -41,9 +44,41 @@ jobs:
           set -euo pipefail
           docker compose --env-file backend/.env up -d --force-recreate --remove-orphans
 
-      - name: Show status
+      # Optional: quick smoke-checks so success is explicit
+      - name: Smoke check - frontend on :80
+        run: |
+          curl -sS -I http://localhost/ | head -n 1
+
+      - name: Show status & recent logs (non-fatal)
         if: always()
         run: |
-          docker compose --env-file backend/.env ps
+          docker compose --env-file backend/.env ps || true
           echo "---- Backend logs (tail) ----"
-          docker comp
+          docker compose --env-file backend/.env logs --no-color --tail=200 backend || true
+          echo "---- Frontend logs (tail) ----"
+          docker compose --env-file backend/.env logs --no-color --tail=200 frontend || true
+          echo "---- Postgres logs (tail) ----"
+          docker compose --env-file backend/.env logs --no-color --tail=80 postgres || true
+
+      # --- cleanup so the tiny disk doesn't choke next run ---
+      - name: Cleanup Docker cache
+        if: always()
+        run: |
+          docker system prune -af
+          docker builder prune -af
+          docker volume ls -qf dangling=true | xargs -r docker volume rm
+
+      - name: Cleanup old runner workdirs (safe)
+        if: always()
+        env:
+          ROOT: ${{ env.RUNNER_WORKSPACE }}
+        run: |
+          echo "Runner workspace: ${ROOT:-$RUNNER_WORKSPACE}"
+          find "${ROOT:-$RUNNER_WORKSPACE}" -mindepth 1 -maxdepth 1 -type d -mtime +2 \
+            ! -path "${GITHUB_WORKSPACE}" -exec rm -rf {} + || true
+
+      - name: Disk & Docker usage (after)
+        if: always()
+        run: |
+          df -h
+          docker system df || true
