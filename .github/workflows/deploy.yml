@@ -31,7 +31,7 @@ jobs:
 
       # --- Build both images (compose will use your root docker-compose.yml) ---
       - name: Build images
-        run: docker compose build --pull
+        run: docker compose build --pull --progress=plain
 
       # --- Run (or re-run) the stack ---
       - name: Start stack
