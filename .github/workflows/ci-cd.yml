@@ -39,15 +39,29 @@ jobs:
           set -euo pipefail
           docker compose --env-file backend/.env build --pull
 
-      - name: Start/Update stack (with env)
+      - name: Start/Update stack (apps only; keep DB up)
         run: |
           set -euo pipefail
           docker compose --env-file backend/.env up -d --force-recreate --no-deps backend frontend
 
-      # Optional: quick smoke-checks so success is explicit
-      - name: Smoke check - frontend on :80
+      # --- smoke checks ---
+      - name: Smoke check - backend on :5000 (IPv4)
         run: |
-          curl -sS -I http://localhost/ | head -n 1
+          set -e
+          for i in {1..30}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/api/health || true)
+            if [ "$code" = "200" ]; then echo "Backend OK at /api/health"; exit 0; fi
+            # fallback to root if no health route
+            code2=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/ || true)
+            if [ "$code2" = "200" ]; then echo "Backend OK at /"; exit 0; fi
+            sleep 2
+          done
+          echo "Backend did not become healthy"; exit 1
+
+      - name: Smoke check - frontend on :80 (IPv4)
+        run: |
+          # -4 forces IPv4 so we don't hit ::1
+          curl -4 -sS -I http://localhost/ | head -n 1
 
       - name: Show status & recent logs (non-fatal)
         if: always()
