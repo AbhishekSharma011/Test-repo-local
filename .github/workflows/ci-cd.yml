@@ -42,7 +42,7 @@ jobs:
       - name: Start/Update stack (with env)
         run: |
           set -euo pipefail
-          docker compose --env-file backend/.env up -d --force-recreate --remove-orphans
+          docker compose --env-file backend/.env up -d --force-recreate --no-deps backend frontend
 
       # Optional: quick smoke-checks so success is explicit
       - name: Smoke check - frontend on :80
