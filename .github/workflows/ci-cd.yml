@@ -11,20 +11,18 @@ concurrency:
 
 jobs:
   deploy:
-    # if you created an Environment in GitHub named "dev" or "prod", set it here:
-    # environment: dev
     runs-on: [self-hosted, linux]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # NEW: Create .env from GitHub Secrets (never printed to logs)
-      - name: Create .env
+      # Create backend/.env from GitHub Secrets
+      - name: Create backend/.env
         shell: bash
         run: |
           set -euo pipefail
-          cat > .env <<'EOF'
+          mkdir -p backend
+          cat > backend/.env <<'EOF'
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           DB_NAME=${{ secrets.DB_NAME }}
@@ -43,10 +41,16 @@ jobs:
           LINKEDIN_CLIENT_ID=${{ secrets.LINKEDIN_CLIENT_ID }}
           LINKEDIN_CLIENT_SECRET=${{ secrets.LINKEDIN_CLIENT_SECRET }}
           LINKEDIN_CALLBACK_URL=${{ secrets.LINKEDIN_CALLBACK_URL }}
-          # Puppeteer hardening
           PUPPETEER_ARGS=--no-sandbox --disable-setuid-sandbox
           EOF
-          chmod 600 .env
+          chmod 600 backend/.env
+
+      - name: Show compose file header (sanity)
+        run: |
+          pwd
+          sed -n '1,120p' docker-compose.yml
+          echo "env_file target:"
+          grep -n "env_file" -n docker-compose.yml || true
 
       - name: Verify Docker & Compose
         run: |

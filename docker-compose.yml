@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -20,17 +18,15 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: buzzly-backend
     env_file:
-      - .env        # keep this only on the EC2 host, do NOT commit
+      - backend/.env    # <-- we will create this via the workflow
     environment:
-      # If you want to use the postgres service instead of localhost:
-      DB_HOST: postgres
+      DB_HOST: postgres # use the compose postgres service; change if external DB
       DB_PORT: 5432
       PORT: 5000
-      # Puppeteer flags (defense-in-depth)
       PUPPETEER_ARGS: "--no-sandbox --disable-setuid-sandbox"
     depends_on:
       postgres:
@@ -40,8 +36,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: buzzly-frontend
     depends_on:
       - backend
