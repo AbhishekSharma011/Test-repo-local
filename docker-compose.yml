@@ -1,18 +1,52 @@
+version: "3.9"
+
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: buzzly-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
-    build: ./backend
-    container_name: app-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: buzzly-backend
+    env_file:
+      - .env        # keep this only on the EC2 host, do NOT commit
+    environment:
+      # If you want to use the postgres service instead of localhost:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      PORT: 5000
+      # Puppeteer flags (defense-in-depth)
+      PUPPETEER_ARGS: "--no-sandbox --disable-setuid-sandbox"
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "5000:5000"
-    env_file:
-      - ./backend/.env   # okay for testing only
-    restart: unless-stopped
 
   frontend:
-    build: ./frontend
-    container_name: app-frontend
-    ports:
-      - "80:80"
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: buzzly-frontend
     depends_on:
       - backend
-    restart: unless-stopped
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
