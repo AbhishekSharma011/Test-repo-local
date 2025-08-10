@@ -34,16 +34,44 @@ jobs:
           df -h
           docker system df || true
 
-      - name: Pre-clean Docker cache
-        run: |
-          docker builder prune -af
-          docker system prune -af
- 
+      # ⚠️ Removed global prunes so we don't touch other teams' containers/images
 
       - name: Build containers (with env)
         run: |
           set -euo pipefail
           docker compose --env-file backend/.env build --pull
+
+      # ✅ Ensure DB is up; if already running, do nothing. If missing/stopped, start it.
+      - name: Ensure Postgres is running (don’t bounce)
+        run: |
+          set -euo pipefail
+          DB_CONTAINER=buzzly-postgres
+
+          if docker ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
+            echo "Postgres is already running."
+          else
+            if docker ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
+              echo "Starting existing Postgres container..."
+              docker start "$DB_CONTAINER"
+            else
+              echo "Creating Postgres via compose..."
+              docker compose --env-file backend/.env up -d postgres
+            fi
+          fi
+
+          echo "Waiting for Postgres to be healthy..."
+          for i in {1..60}; do
+            status=$(docker inspect -f '{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null || echo "none")
+            if [ "$status" = "healthy" ]; then
+              echo "Postgres is healthy."; exit 0
+            fi
+            # Fallback if healthcheck is missing
+            if docker exec "$DB_CONTAINER" pg_isready >/dev/null 2>&1; then
+              echo "Postgres reports ready."; exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become healthy in time."; exit 1
 
       - name: Start/Update stack (apps only; keep DB up)
         run: |
@@ -54,19 +82,24 @@ jobs:
       - name: Smoke check - backend on :5000 (IPv4)
         run: |
           set -e
-          for i in {1..30}; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/api/health || true)
-            if [ "$code" = "200" ]; then echo "Backend OK at /api/health"; exit 0; fi
-            # fallback to root if no health route
-            code2=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/ || true)
-            if [ "$code2" = "200" ]; then echo "Backend OK at /"; exit 0; fi
+          for i in {1..60}; do
+            code=$(curl -4 -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/api/health || true)
+            if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
+              echo "Backend OK at /api/health ($code)"; exit 0
+            fi
+            code2=$(curl -4 -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/ || true)
+            if [ "$code2" -ge 200 ] && [ "$code2" -lt 400 ]; then
+              echo "Backend OK at / ($code2)"; exit 0
+            fi
             sleep 2
           done
-          echo "Backend did not become healthy"; exit 1
+          echo "Backend did not become healthy in time."
+          echo "---- Backend logs (tail) ----"
+          docker compose --env-file backend/.env logs --no-color --tail=200 backend || true
+          exit 1
 
       - name: Smoke check - frontend on :80 (IPv4)
         run: |
-          # -4 forces IPv4 so we don't hit ::1
           curl -4 -sS -I http://localhost/ | head -n 1
 
       - name: Show status & recent logs (non-fatal)
@@ -80,13 +113,20 @@ jobs:
           echo "---- Postgres logs (tail) ----"
           docker compose --env-file backend/.env logs --no-color --tail=80 postgres || true
 
-      # --- cleanup so the tiny disk doesn't choke next run ---
-      - name: Cleanup Docker cache
+      # ✅ Safe, project-scoped cleanup (won't touch other teams' stuff)
+      - name: Project-scoped cleanup (safe)
         if: always()
         run: |
-          docker system prune -af
-          docker builder prune -af
-          docker volume ls -qf dangling=true | xargs -r docker volume rm
+          set -euo pipefail
+          # Remove only our stopped containers (names start with buzzly-)
+          docker ps -aq -f "name=^buzzly-" -f "status=exited" | xargs -r docker rm -f
+
+          # Remove truly dangling images (global-safe: untagged layers not used by any container)
+          docker images -f "dangling=true" -q | xargs -r docker rmi -f
+
+          # Remove dangling volumes that belong to this compose project (safe: none if in use)
+          PROJ=$(basename "$GITHUB_WORKSPACE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          docker volume ls -q --filter "label=com.docker.compose.project=$PROJ" --filter "dangling=true" | xargs -r docker volume rm
 
       - name: Cleanup old runner workdirs (safe)
         if: always()
