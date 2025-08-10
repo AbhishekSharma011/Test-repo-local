@@ -35,11 +35,11 @@ ENV PUPPETEER_ARGS="--no-sandbox --disable-setuid-sandbox"
 
 WORKDIR /app
 
-# install deps using only backend context
+# Install dependencies using only backend context
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
-# copy source
+# Copy backend source code
 COPY . .
 
 EXPOSE 5000
