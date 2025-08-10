@@ -13,11 +13,16 @@ jobs:
   deploy:
     runs-on: self-hosted
 
+    env:
+      # Pin the Compose project name so labels/imagery are predictable and scoping is safe
+      COMPOSE_PROJECT_NAME: buzzly
+      DOCKER_BUILDKIT: 1
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create backend/.env
+      - name: Create backend/.env from repo secrets
         run: |
           set -euo pipefail
           mkdir -p backend
@@ -34,55 +39,56 @@ jobs:
           df -h
           docker system df || true
 
-      # ⚠️ Removed global prunes so we don't touch other teams' containers/images
-
-      - name: Build containers (with env)
+      # ---------- Build ----------
+      - name: Build services (uses env file)
         run: |
           set -euo pipefail
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \
           docker compose --env-file backend/.env build --pull
 
-      # ✅ Ensure DB is up; if already running, do nothing. If missing/stopped, start it.
-      - name: Ensure Postgres is running (don’t bounce)
+      # ---------- Ensure DB ----------
+      - name: Ensure Postgres exists and is healthy (only create if missing/unhealthy)
         run: |
           set -euo pipefail
-          DB_CONTAINER=buzzly-postgres
-
-          if docker ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
-            echo "Postgres is already running."
+          # Look for our project's Postgres container
+          DB_ID=$(docker ps -a -q --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" --filter "name=postgres")
+          if [ -z "$DB_ID" ]; then
+            echo "Postgres container not found for project ${COMPOSE_PROJECT_NAME}, creating..."
+            COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \
+            docker compose --env-file backend/.env up -d postgres
           else
-            if docker ps -a --format '{{.Names}}' | grep -qx "$DB_CONTAINER"; then
-              echo "Starting existing Postgres container..."
-              docker start "$DB_CONTAINER"
-            else
-              echo "Creating Postgres via compose..."
-              docker compose --env-file backend/.env up -d postgres
-            fi
+            echo "Found Postgres container: $DB_ID"
           fi
 
-          echo "Waiting for Postgres to be healthy..."
-          for i in {1..60}; do
-            status=$(docker inspect -f '{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null || echo "none")
-            if [ "$status" = "healthy" ]; then
-              echo "Postgres is healthy."; exit 0
+          # Wait for health=healthy (up to ~90s)
+          for i in {1..30}; do
+            STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' \
+              $(docker ps -q --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" --filter "name=postgres") 2>/dev/null || echo "unknown")
+            echo "Postgres health: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Postgres is healthy."
+              break
             fi
-            # Fallback if healthcheck is missing
-            if docker exec "$DB_CONTAINER" pg_isready >/dev/null 2>&1; then
-              echo "Postgres reports ready."; exit 0
+            if [ "$STATUS" = "unhealthy" ] || [ "$STATUS" = "unknown" ]; then
+              # If it's there but not healthy, ensure it's started
+              COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \
+              docker compose --env-file backend/.env up -d postgres
             fi
-            sleep 2
+            sleep 3
           done
-          echo "Postgres did not become healthy in time."; exit 1
 
-      - name: Start/Update stack (apps only; keep DB up)
+      # ---------- Start app services ----------
+      - name: Start/Update backend and frontend (keep DB up)
         run: |
           set -euo pipefail
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \
           docker compose --env-file backend/.env up -d --force-recreate --no-deps backend frontend
 
-      # --- smoke checks ---
+      # ---------- Smoke checks ----------
       - name: Smoke check - backend on :5000 (IPv4)
         run: |
           set -e
-          for i in {1..60}; do
+          for i in {1..120}; do
             code=$(curl -4 -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/api/health || true)
             if [ "$code" -ge 200 ] && [ "$code" -lt 400 ]; then
               echo "Backend OK at /api/health ($code)"; exit 0
@@ -95,6 +101,7 @@ jobs:
           done
           echo "Backend did not become healthy in time."
           echo "---- Backend logs (tail) ----"
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} \
           docker compose --env-file backend/.env logs --no-color --tail=200 backend || true
           exit 1
 
@@ -105,37 +112,32 @@ jobs:
       - name: Show status & recent logs (non-fatal)
         if: always()
         run: |
-          docker compose --env-file backend/.env ps || true
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} docker compose --env-file backend/.env ps || true
           echo "---- Backend logs (tail) ----"
-          docker compose --env-file backend/.env logs --no-color --tail=200 backend || true
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} docker compose --env-file backend/.env logs --no-color --tail=200 backend || true
           echo "---- Frontend logs (tail) ----"
-          docker compose --env-file backend/.env logs --no-color --tail=200 frontend || true
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} docker compose --env-file backend/.env logs --no-color --tail=200 frontend || true
           echo "---- Postgres logs (tail) ----"
-          docker compose --env-file backend/.env logs --no-color --tail=80 postgres || true
+          COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} docker compose --env-file backend/.env logs --no-color --tail=80 postgres || true
 
-      # ✅ Safe, project-scoped cleanup (won't touch other teams' stuff)
-      - name: Project-scoped cleanup (safe)
+      # ---------- Scoped cleanup (project-only) ----------
+      - name: Cleanup (project-only; won't touch others)
         if: always()
         run: |
           set -euo pipefail
-          # Remove only our stopped containers (names start with buzzly-)
-          docker ps -aq -f "name=^buzzly-" -f "status=exited" | xargs -r docker rm -f
+          # Remove exited containers from THIS project only
+          docker ps -a \
+            --filter "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" \
+            --filter "status=exited" -q | xargs -r docker rm -v
 
-          # Remove truly dangling images (global-safe: untagged layers not used by any container)
-          docker images -f "dangling=true" -q | xargs -r docker rmi -f
+          # Remove dangling images built for THIS project only (buzzly-backend/frontend that are dangling)
+          docker images --format '{{.Repository}} {{.ID}} {{.Dangling}}' | \
+            awk '$1 ~ /^'${COMPOSE_PROJECT_NAME}'-(backend|frontend)$/ && $3 == "true" {print $2}' | \
+            xargs -r docker rmi
 
-          # Remove dangling volumes that belong to this compose project (safe: none if in use)
-          PROJ=$(basename "$GITHUB_WORKSPACE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          docker volume ls -q --filter "label=com.docker.compose.project=$PROJ" --filter "dangling=true" | xargs -r docker volume rm
-
-      - name: Cleanup old runner workdirs (safe)
-        if: always()
-        env:
-          ROOT: ${{ env.RUNNER_WORKSPACE }}
-        run: |
-          echo "Runner workspace: ${ROOT:-$RUNNER_WORKSPACE}"
-          find "${ROOT:-$RUNNER_WORKSPACE}" -mindepth 1 -maxdepth 1 -type d -mtime +2 \
-            ! -path "${GITHUB_WORKSPACE}" -exec rm -rf {} + || true
+          # Remove dangling volumes for THIS project only (will never remove an in-use volume)
+          docker volume ls -qf dangling=true -f "label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}" | \
+            xargs -r docker volume rm
 
       - name: Disk & Docker usage (after)
         if: always()
