@@ -23,6 +23,8 @@ import authService from "../../services/authService";
 import { useNavigate } from "react-router";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+import HexaLoader from "../loader/Loader";
+import { API_BASE_URL } from "../../services/api";
 
 const Login = ({ isPopup = false }) => {
   const [isRegister, setIsRegister] = useState(false);
@@ -33,6 +35,8 @@ const Login = ({ isPopup = false }) => {
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const toggleMode = () => {
@@ -54,6 +58,7 @@ const Login = ({ isPopup = false }) => {
     }
 
     try {
+       setLoading(true);
       const data = isRegister
         ? await authService.register({ email, password })
         : await authService.login(email, password);
@@ -81,49 +86,61 @@ const Login = ({ isPopup = false }) => {
       }
     } catch (err) {
       setError(err.message);
+       setLoading(false);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    console.log("✅ Google Login Response:", credentialResponse);
+  console.log("✅ Google Login Response:", credentialResponse);
 
-    if (!credentialResponse.credential) {
-      setError("No credential returned from Google");
-      return;
-    }
+  if (!credentialResponse.credential) {
+    setError("No credential returned from Google");
+    return;
+  }
 
-    try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      console.log("✅ Decoded Google User:", decoded);
+  try {
+    setLoading(true); // start loader
 
-      const { email, name, sub: googleId } = decoded;
+    const decoded = jwtDecode(credentialResponse.credential);
+    console.log("✅ Decoded Google User:", decoded);
 
-      const res = await fetch("http://localhost:5000/api/auth/google-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, googleId }),
-      });
+    const { email, name, sub: googleId } = decoded;
 
-      const data = await res.json();
+    const res = await fetch(`${API_BASE_URL}/auth/google-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name, googleId }),
+    });
 
-      if (res.ok) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token);
+    const data = await res.json();
+
+    if (res.ok) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+
+      
+      setTimeout(() => {
         navigate("/dashboard");
-      } else {
-        setError(data.message || "Login failed");
-      }
-    } catch (err) {
-      console.error("❌ Google Login Error:", err);
-      setError("Google login failed");
+        
+        setLoading(false);
+      }, 1000);
+    } else {
+      setError(data.message || "Login failed");
+      setLoading(false);
     }
-  };
+  } catch (err) {
+    console.error("❌ Google Login Error:", err);
+    setError("Google login failed");
+    setLoading(false);
+  }
+};
+
 
   const redirectToTwitter = () => {
     try {
       const clientId = "OEkyejYzcXlKVkZmX2RVekFFUFc6MTpjaQ";
       const redirectUri = encodeURIComponent(
-        "http://localhost:5000/api/auth/twitter/callback"
+        `${API_BASE_URL}/auth/twitter/callback`
       );
       const scope = encodeURIComponent(
        'tweet.read tweet.write users.read offline.access'
@@ -145,6 +162,25 @@ const Login = ({ isPopup = false }) => {
   };
 
   return (
+    <>
+    {loading && (
+      <Box
+        sx={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "rgba(255,255,255,0.7)",
+          zIndex: 9999,
+        }}
+      >
+        <HexaLoader />
+      </Box>
+    )}
     <Box sx={{
       display: "flex",
       flexDirection: "column",
@@ -333,6 +369,8 @@ const Login = ({ isPopup = false }) => {
         </Card>
       </Container>
     </Box>
+    </>
+
   );
 };
 

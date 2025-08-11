@@ -5,7 +5,12 @@
 //   return response.data.data;
 // };
 
-const BASE_URL = 'http://localhost:5000/api';
+// Set API base URL based on environment
+const API_BASE = process.env.REACT_APP_API_BASE ||
+                (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api');
+
+// Export API_BASE for use in other files
+export const API_BASE_URL = API_BASE;
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
@@ -25,7 +30,7 @@ export const apiPost = async (endpoint, data, token = null) => {
       headers['X-User-Data'] = userStr;
     }
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),

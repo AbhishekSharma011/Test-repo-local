@@ -1,5 +1,6 @@
 import axios from 'axios'
-const BASE_URL = 'http://localhost:5000/api/auth';
+import { API_BASE_URL } from './api';
+const BASE_URL = `${API_BASE_URL}/auth`;
 
 // Login with email and password
 export const login = async (email, password) => {
@@ -55,7 +56,7 @@ export const convertTwitterToken = async (accessToken) => {
 export const getReplyIdForTweet = async ()=>{
   try {
     const tweetId = localStorage.getItem("selected_tweet_id");
-    const response = await axios.post(`http://localhost:5000/api/reply-id`, {
+    const response = await axios.post(`${API_BASE_URL}/reply-id`, {
       tweetId
     });
     return response.data;
