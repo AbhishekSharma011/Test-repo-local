@@ -27,6 +27,23 @@ app.use('/api', socialMediaAccountsRoutes);
 app.use('/api', trendingRoutes);
 app.use('/api', postHistoryRoutes); // This registers all routes in postHistoryRoutes.js under /api
 app.use('/api', promptRoutes); // Register prompt routes
+app.get('/api/health', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT 1 as ok');
+    res.status(200).json({
+      status: 'ok',
+      db: r.rows?.[0]?.ok === 1 ? 'up' : 'unknown',
+      time: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      db: 'down',
+      error: err.message
+    });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.get('/', async (req, res) => {
   const accessToken = req.query.twitterId;
