@@ -1,5 +1,3 @@
-
-
 // index.js
 const express = require('express');
 const cors = require('cors');
@@ -13,6 +11,8 @@ const trendingRoutes = require('./routes/trendingRoutes');
 const postHistoryRoutes = require('./routes/postHistoryRoutes');
 const promptRoutes = require('./routes/promptRoutes');
 dotenv.config();
+
+const pool = require('./db'); // ← added so /api/health can query the DB
 
 // Run the script to check and create tables if they don't exist
 require('./scripts/check-and-create-tables');
