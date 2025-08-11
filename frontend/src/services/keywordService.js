@@ -1,6 +1,4 @@
-import { apiPost } from './api';
-
-const BASE_URL = 'http://localhost:5000/api';
+import { apiPost, API_BASE_URL } from './api';
 
 // Helper function for GET requests
 const apiGet = async (endpoint, token = null) => {
@@ -12,7 +10,7 @@ const apiGet = async (endpoint, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers,
     });
@@ -39,7 +37,7 @@ const apiDelete = async (endpoint, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
       headers,
     });
@@ -66,7 +64,7 @@ const apiPut = async (endpoint, data, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data),

@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:5000/api';
+import { API_BASE_URL } from './api';
 
 // Helper function for GET requests
 const apiGet = async (endpoint, token = null) => {
@@ -16,7 +16,7 @@ const apiGet = async (endpoint, token = null) => {
       headers['X-User-Data'] = userStr;
     }
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers,
     });
@@ -43,7 +43,7 @@ const apiPost = async (endpoint, data = {}, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
@@ -140,7 +140,7 @@ export const deletePost = async (postId, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}/history/${postId}`, {
+    const res = await fetch(`${API_BASE_URL}/history/${postId}`, {
       method: 'DELETE',
       headers,
     });
@@ -167,7 +167,7 @@ export const deleteLinkedInPost = async (postId, token = null) => {
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    const res = await fetch(`${BASE_URL}/history/linkedin/${postId}`, {
+    const res = await fetch(`${API_BASE_URL}/history/linkedin/${postId}`, {
       method: 'DELETE',
       headers,
     });
@@ -198,10 +198,10 @@ export const updateEngagementMetrics = async (postId, metrics, token = null) => 
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    console.log('Request URL:', `${BASE_URL}/update-engagement/${postId}`);
+    console.log('Request URL:', `${API_BASE_URL}/update-engagement/${postId}`);
     console.log('Request headers:', headers);
     
-    const res = await fetch(`${BASE_URL}/update-engagement/${postId}`, {
+    const res = await fetch(`${API_BASE_URL}/update-engagement/${postId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(metrics),
@@ -246,10 +246,10 @@ export const updateLinkedInEngagementMetrics = async (postId, metrics, token = n
     // Always include Authorization header, even with a dummy token for development
     headers.Authorization = `Bearer ${token || 'dummy-token'}`;
     
-    console.log('Request URL:', `${BASE_URL}/update-engagement/linkedin/${postId}`);
+    console.log('Request URL:', `${API_BASE_URL}/update-engagement/linkedin/${postId}`);
     console.log('Request headers:', headers);
     
-    const res = await fetch(`${BASE_URL}/update-engagement/linkedin/${postId}`, {
+    const res = await fetch(`${API_BASE_URL}/update-engagement/linkedin/${postId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(metrics),
@@ -292,11 +292,11 @@ export const scrapeReplyEngagement = async (replyId, accountId, token = null) =>
 
     const body = JSON.stringify({ replyId, accountId });
 
-    console.log('Request URL:', `${BASE_URL}/scrape-reply-engagement`);
+    console.log('Request URL:', `${API_BASE_URL}/scrape-reply-engagement`);
     console.log('Request headers:', headers);
     console.log('Request body:', body);
 
-    const res = await fetch(`${BASE_URL}/scrape-reply-engagement`, {
+    const res = await fetch(`${API_BASE_URL}/scrape-reply-engagement`, {
       method: 'POST',
       headers,
       body,

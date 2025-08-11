@@ -48,47 +48,39 @@ const Login = ({ isPopup = false }) => {
     setConfirmPass("");
   };
 
-  const handleSubmit = async () => {
-    setError("");
-    setSuccess("");
+ const handleSubmit = async () => {
+  setError("");
+  setSuccess("");
 
-    if (isRegister && password !== confirmPass) {
-      setError("Passwords don't match");
-      return;
+  if (isRegister && password !== confirmPass) {
+    setError("Passwords don't match");
+    return;
+  }
+
+  setLoading(true);
+  try {
+    if (isRegister) {
+      const data = await authService.register({ email, password });
+      setSuccess(data?.message || "Registration successful. Please log in.");
+      setPassword("");
+      setConfirmPass("");
+      // show login form on the same page
+      if (typeof setIsRegister === "function") setIsRegister(false);
+      // optional: navigate("/"); // only if route change is needed
+    } else {
+      const data = await authService.login(email, password);
+      setSuccess(data?.message || "Login successful");
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      navigate("/dashboard");
     }
+  } catch (err) {
+    setError(err?.response?.data?.message || err.message || "Something went wrong");
+  } finally {
+    setLoading(false); // ✅ always turn off
+  }
+};
 
-    try {
-       setLoading(true);
-      const data = isRegister
-        ? await authService.register({ email, password })
-        : await authService.login(email, password);
-
-      setSuccess(data.message);
-
-      if (isRegister) {
-        // After successful registration, automatically log in the user
-        try {
-          const loginData = await authService.login(email, password);
-          console.log("Logged in user:", loginData.user);
-          localStorage.setItem("user", JSON.stringify(loginData.user));
-          localStorage.setItem("token", loginData.token);
-          navigate("/dashboard");
-        } catch (loginErr) {
-          // If auto-login fails, show success message but don't navigate
-          console.error("Auto-login after registration failed:", loginErr);
-          setSuccess(data.message + " Please log in with your new credentials.");
-        }
-      } else {
-        console.log("Logged in user:", data.user);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token);
-        navigate("/dashboard");
-      }
-    } catch (err) {
-      setError(err.message);
-       setLoading(false);
-    }
-  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
   console.log("✅ Google Login Response:", credentialResponse);

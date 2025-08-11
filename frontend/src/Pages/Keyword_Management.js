@@ -11,6 +11,7 @@ import {
   CardContent,
 } from "@mui/material";
 import axios from "axios";
+import { API_BASE_URL } from "../services/api";
 
 const mockTrending = [
   "AI",
@@ -67,7 +68,7 @@ const Keyword_Management = () => {
     if (keywords.length === 0) return;
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/search", {
+      const res = await axios.get(`${API_BASE_URL}/search`, {
         params: {
           keyword: keywords.join(","), // "modi,cricket"
           minLikes: likesFilter,
